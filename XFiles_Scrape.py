@@ -2,6 +2,7 @@
 
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 URL = 'http://www.insidethex.co.uk/'
 
@@ -23,11 +24,17 @@ for table in tables:
         if len(title_col) == 0:
             cols = row.find_all('td')
             ep_trans = cols[0].find_all('a')[0].get('href')
-            ep_name = cols[0].contents[0].string
+            ep_name = cols[0].contents[0].string.strip()
             ep_num = cols[1].string
             ep_aired = cols[2].string
+            # Episodes are classified as 'Mythos' or 'MOTW' (Monster of the Week)
+            if ep_name[-1] == '*':
+                ep_type = 'Mythos'
+            else:
+                ep_type = 'MOTW'
+            ep_name = ep_name.strip('*').strip()
 
-            ep_data = [ep_trans, ep_name, ep_num, ep_aired]
+            ep_data = [ep_name, ep_num, ep_type, ep_aired, ep_trans]
             xfiles_eps.append(ep_data)
 
 # Loop through transcripts
@@ -35,13 +42,14 @@ for table in tables:
 xfiles_lines = []
 xfiles_scenes = []
 
-xfiles_eps = xfiles_eps[5:7]
+# Test fewer episodes:
+# xfiles_eps = xfiles_eps[5:7]
 
 for ep in xfiles_eps:
 
-    ep_url = URL + ep[0]
-    ep_id = ep[2]
-    print("Loading Episode: " + ep[1])
+    ep_url = URL + ep[4]
+    ep_id = ep[1]
+    print("Loading Episode: " + ep[0] + " " + ep_id)
 
     tr_html = requests.get(ep_url).content
     tr_soup = BeautifulSoup(tr_html, 'lxml')
@@ -58,23 +66,27 @@ for ep in xfiles_eps:
         scene_desc = ''.join(scene_details[1:]).replace('\n', ' ').strip()
 
         if '(' in scene_desc:
-            context = scene_desc.split('(')[1].split(')')[0]
+            try:
+                context = scene_desc.split('(')[1].split(')')[0]
+                scene_desc = scene_desc.split('(')[0] + scene_desc.split(')')[1]
+            except:
+                context = scene_desc.split('(')[1]
+                scene_desc = scene_desc.split('(')[0]
             context = '(' + context + ')'
 
             caught_data = [ep_id, scene_num, "Context", "", context]
             xfiles_lines.append(caught_data)
-            
-            scene_desc = scene_desc.split('(')[0] + scene_desc.split(')')[1]
         
         if '<b>' in scene_desc:
             s_text = scene_desc.split('<b>')[1].split(':</b>')
-            s_char = s_text[0]
-            s_line = s_text[1].strip()
+            if len(s_text) > 1:
+                s_char = s_text[0]
+                s_line = s_text[1].strip()
+                
+                caught_data = [ep_id, scene_num, "Line", s_char, s_line]
+                xfiles_lines.append(caught_data)
 
-            caught_data = [ep_id, scene_num, "Line", s_char, s_line]
-            xfiles_lines.append(caught_data)
-
-            scene_desc = scene_desc.split('<b>')[0]
+                scene_desc = scene_desc.split('<b>')[0]
         
         scene_desc = scene_desc.strip()
 
@@ -110,11 +122,16 @@ for ep in xfiles_eps:
                     xfiles_lines.append(line_data)
 
 
-print("\nLines Sample:")        
-for i in range(15):
-    print(xfiles_lines[i])
 
+# Export Data to CSV
 
-print("\nScenes Sample:")
-for i in range(12):
-    print(xfiles_scenes[i])
+eps_df = pd.DataFrame(data=xfiles_eps, columns=['Episode Name', 'Episode Number', 'Episode Type', 'Date Aired', 'Transcript URL'])
+scenes_df = pd.DataFrame(data=xfiles_scenes, columns=['Episode Number', 'Scene Number', 'Scene Description'])
+lines_df = pd.DataFrame(data=xfiles_lines, columns=['Episode Number', 'Scene Number', 'Line Type', 'Character Name', 'Script'])
+
+eps_df.to_csv('X_Files_Episodes.csv', sep=',', index=False)
+print("Episodes CSV created...")
+scenes_df.to_csv('X_Files_Scenes.csv', sep=',', index=False)
+print("Scenes CSV created...")
+lines_df.to_csv('X_Files_Lines.csv', sep=',', index=False)
+print("Lines CSV created...")
