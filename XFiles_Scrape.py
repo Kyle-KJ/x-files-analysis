@@ -45,6 +45,7 @@ xfiles_scenes = []
 # Test fewer episodes:
 # xfiles_eps = xfiles_eps[5:7]
 
+# For each episode
 for ep in xfiles_eps:
 
     ep_url = URL + ep[4]
@@ -59,12 +60,15 @@ for ep in xfiles_eps:
     body_split = body.rsplit("[THE END]")[0]
     scenes = body_split.split("SCENE ")[1:]
 
+    # For each scene
     for scene in scenes:
 
         scene_details = scene.split("<p>")[0].rsplit("<br/>")
         scene_num = "Scene " + scene_details[0].strip()
         scene_desc = ''.join(scene_details[1:]).replace('\n', ' ').strip()
 
+        # Transcript not always structured uniformly
+        # Below if statements help to capture leaks
         if '(' in scene_desc:
             try:
                 context = scene_desc.split('(')[1].split(')')[0]
@@ -97,6 +101,7 @@ for ep in xfiles_eps:
         scene_soup = BeautifulSoup(scene, 'lxml')
         paras = scene_soup.find_all('p')[1:]
 
+        # For each line
         for para in paras:
 
             try:
